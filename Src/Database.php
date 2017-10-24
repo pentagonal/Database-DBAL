@@ -511,7 +511,7 @@ class Database
             // maria-db is a mysql, there was much of unknown people use it
             if (preg_match('~maria|mysq~i', $driverName)) {
                 $driverName = self::DRIVER_MYSQL;
-            } elseif (preg_match('~postg|pgsql~i', $driverName)) {
+            } elseif (preg_match('~postg|pg?sql~i', $driverName)) {
                 $driverName = self::DRIVER_PGSQL;
             } elseif (strpos($driverName, 'sqlit') !== false) {
                 $driverName = self::DRIVER_SQLITE;
