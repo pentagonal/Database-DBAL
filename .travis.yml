@@ -1,0 +1,24 @@
+# Grant
+sudo: false
+
+# Operating System
+os: linux
+group: stable
+
+# Script Language
+language: php
+
+# Php Tests version
+php:
+  - 7.0
+  - 7.1
+
+before_script:
+  - composer install -o -vv
+
+script:
+  - ./vendor/bin/phpcs
+
+# Matrix RULES
+matrix:
+  fast_finish: true

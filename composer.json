@@ -1,0 +1,23 @@
+{
+  "name": "pentagonal/database-dbal",
+  "type": "library",
+  "require": {
+    "php": ">= 7.0",
+    "ext-pdo": "*",
+    "doctrine/dbal": "^2.5"
+  },
+  "require-dev": {
+    "squizlabs/php_codesniffer": "3.*"
+  },
+  "authors": [
+    {
+      "name": "pentagonal",
+      "email": "org@pentagonal.org"
+    }
+  ],
+  "autoload" : {
+    "psr-4": {
+      "Pentagonal\\DatabaseDBAL\\": "Src/"
+    }
+  }
+}
