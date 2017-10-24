@@ -145,7 +145,29 @@ $stmtPrepareExecute->fetchAll();
 $stmtPrepareExecute->closeCursor();
 
 ```
+
+## REQUIREMENTS
+
+```
+- php 7.0 or later
+- Pdo Php extension
+
+Suggest:
+
+- ext-iconv 
+- ext-mb_string
+
+```
+
 ## INSTALLING
+
+```json
+{
+  "require": {
+    "pentagonal/database-dbal": "~1"
+  }
+}
+```
 
 ## LICENSE
 
