@@ -1,8 +1,18 @@
 {
   "name": "pentagonal/database-dbal",
+  "description": "Just to extend `Doctrine DBAL` in an easier way for `lazy people`",
   "type": "library",
+  "keywords": [
+    "dbal",
+    "database",
+    "persistence",
+    "doctrine",
+    "lazy",
+    "helper"
+  ],
+  "license": "MIT",
   "require": {
-    "php": ">= 7.0",
+    "php": "^7.0",
     "ext-pdo": "*",
     "doctrine/dbal": "^2.5"
   },
@@ -15,6 +25,10 @@
       "email": "org@pentagonal.org"
     }
   ],
+  "suggest" : {
+    "ext-iconv": "for sanitation usage for invalid UTF-8 characters",
+    "ext-mbstring": "to check length for sanitation"
+  },
   "autoload" : {
     "psr-4": {
       "Pentagonal\\DatabaseDBAL\\": "Src/"
