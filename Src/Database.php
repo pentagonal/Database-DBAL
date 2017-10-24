@@ -128,6 +128,12 @@ use Doctrine\DBAL\Schema\View;
 class Database
 {
     /**
+     * @var StringSanitizerTrait
+     * use for sanitize database
+     */
+    use StringSanitizerTrait;
+
+    /**
      * @see Connection::TRANSACTION_READ_UNCOMMITTED
      */
     const TRANSACTION_READ_UNCOMMITTED = Connection::TRANSACTION_READ_UNCOMMITTED;
@@ -201,7 +207,7 @@ class Database
      *
      * @var string
      */
-    protected $defaultDriver = 'mysql';
+    protected $defaultDriver = 'pdo_mysql';
 
     /**
      * Default character Set
@@ -225,6 +231,20 @@ class Database
         DB_COLLATE  = 'collate';
 
     /**
+     * Driver
+     */
+    const
+        DRIVER_MYSQL   = 'pdo_mysql',
+        DRIVER_PGSQL   = 'pdo_pgsql',
+        DRIVER_SQLITE  = 'pdo_sqlite',
+        DRIVER_DRIZZLE = 'drizzle_pdo_mysql',
+        DRIVER_DB2     = 'ibm_db2',
+        DRIVER_SQLSRV  = 'pdo_sqlsrv',
+        DRIVER_OCI8    = 'oci8';
+
+    /**
+     * Last configurations param
+     *
      * @var array
      */
     protected static $lastParams;
@@ -260,9 +280,20 @@ class Database
         $this->currentUserParams[self::DB_DRIVER] = $this->currentSelectedDriver;
 
         /**
+         * Remove Unwanted Params
+         */
+        $params = $this->currentUserParams;
+        unset($params['pass']);
+        foreach ($params as $key => $values) {
+            if (is_numeric($key) || $key !== self::DB_NAME && stripos($key, 'db') === 0) {
+                unset($params[$key]);
+            }
+        }
+
+        /**
          * Create New Connection
          */
-        $this->currentConnection = DriverManager::getConnection($this->currentUserParams);
+        $this->currentConnection = DriverManager::getConnection($params);
 
         // set last params
         static::$lastParams = $this->currentUserParams;
@@ -287,7 +318,7 @@ class Database
     {
         return !is_array($config)
             // fallback to last param
-            ? static::createLastParams()
+            ? static::createFromLastParams()
             : new static($config);
     }
 
@@ -296,7 +327,7 @@ class Database
      *
      * @return Database
      */
-    public static function createLastParams() : Database
+    public static function createFromLastParams() : Database
     {
         if (empty(static::$lastParams)) {
             throw new \RuntimeException(
@@ -345,14 +376,34 @@ class Database
             }
             if (!isset($currentUserParams[$key]) && isset($currentUserParams[$name])) {
                 $currentUserParams[$key] = $currentUserParams[$name];
-                unset($currentUserParams[$name]);
             }
         }
 
-        // re-sanitize
-        if (!isset($currentUserParams[self::DB_PASSWORD]) && isset($currentUserParams['dbpassword'])) {
-            $currentUserParams[self::DB_PASSWORD] = $currentUserParams['dbpassword'];
-            unset($currentUserParams['dbpassword']);
+        // re-sanitize db host
+        if (!isset($currentUserParams[self::DB_HOST])) {
+            if (isset($currentUserParams['hostname'])) {
+                $currentUserParams[self::DB_HOST] = $currentUserParams['hostname'];
+            } elseif (isset($currentUserParams['dbhostname'])) {
+                $currentUserParams[self::DB_HOST] = $currentUserParams['dbhostname'];
+            }
+        }
+
+        // re-sanitize db password
+        if (!isset($currentUserParams[self::DB_PASSWORD])) {
+            if (isset($currentUserParams['dbpassword'])) {
+                $currentUserParams[self::DB_PASSWORD] = $currentUserParams['dbpassword'];
+            } elseif (isset($currentUserParams['pass'])) {
+                $currentUserParams[self::DB_PASSWORD] = $currentUserParams['pass'];
+            }
+        }
+
+        // re-sanitize db user
+        if (!isset($currentUserParams[self::DB_USER])) {
+            if (isset($currentUserParams['dbusername'])) {
+                $currentUserParams[self::DB_USER] = $currentUserParams['dbusername'];
+            } elseif (isset($currentUserParams['username'])) {
+                $currentUserParams[self::DB_USER] = $currentUserParams['username'];
+            }
         }
 
         /**
@@ -362,15 +413,22 @@ class Database
             && isset($currentUserParams[self::DB_PORT])
             && abs($currentUserParams[self::DB_PORT]) === 3306
         ) {
-            $currentUserParams[self::DB_DRIVER] = 'mysql';
+            $currentUserParams[self::DB_DRIVER] = 'pdo_mysql';
         }
+
         if (empty($currentUserParams[self::DB_DRIVER])) {
             $currentUserParams[self::DB_DRIVER] = $this->defaultDriver;
         }
 
         if (!empty($currentUserParams[self::DB_DRIVER])) {
             $currentUserParams[self::DB_DRIVER] = $this
-                ->normalizeDatabaseDriver($this->currentUserParams[self::DB_DRIVER]);
+                ->normalizeDatabaseDriver($currentUserParams[self::DB_DRIVER]);
+        }
+
+        if (empty($currentUserParams[self::DB_PORT])
+            && $currentUserParams[self::DB_DRIVER] === 'pdo_mysql'
+        ) {
+            $currentUserParams[self::DB_PORT] = 3306;
         }
 
         if (!empty($currentUserParams[self::DB_DRIVER])
@@ -450,29 +508,21 @@ class Database
     {
         if (is_string($driverName) && trim($driverName)) {
             $driverName = trim(strtolower($driverName));
-            /**
-             * switch to Doctrine fixed db
-             * Aliases
-             */
-            $driverSchemeAliases = [
-                'db2'        => 'ibm_db2',
-                'drizzle'    => 'drizzle_pdo_mysql',
-                'mssql'      => 'pdo_sqlsrv',
-                'mysql'      => 'pdo_mysql',
-                'mysql2'     => 'pdo_mysql', // Amazon RDS, for some weird reason
-                'postgre'    => 'pdo_pgsql',
-                'postgre_sql'=> 'pdo_pgsql',
-                'postgres'   => 'pdo_pgsql',
-                'postgresql' => 'pdo_pgsql',
-                'pgsql'      => 'pdo_pgsql',
-                'sqlite'     => 'pdo_sqlite',
-                'sqlite3'    => 'pdo_sqlite',
-                'oci'        => 'oci8',
-                'pdo_oci'    => 'oci8',   # recommendation pdo_oci uses oci8
-                'pdo_sqlsrv' => 'sqlsrv', #recommendation pdo_sqlsrv uses sqlsrv
-            ];
-            if (isset($driverSchemeAliases[$driverName])) {
-                $driverName = $driverSchemeAliases[$driverName];
+            // maria-db is a mysql, there was much of unknown people use it
+            if (preg_match('~maria|mysq~i', $driverName)) {
+                $driverName = self::DRIVER_MYSQL;
+            } elseif (preg_match('~postg|pgsql~i', $driverName)) {
+                $driverName = self::DRIVER_PGSQL;
+            } elseif (strpos($driverName, 'sqlit') !== false) {
+                $driverName = self::DRIVER_SQLITE;
+            } elseif (strpos($driverName, 'oci') !== false) {
+                $driverName = self::DRIVER_OCI8;
+            } elseif (strpos($driverName, 'drizz') !== false) {
+                $driverName = self::DRIVER_DRIZZLE;
+            } elseif (preg_match('~ibm|db2~i', $driverName)) {
+                $driverName = self::DRIVER_DB2;
+            } elseif (preg_match('~mssql|sqlsrv~i', $driverName)) {
+                $driverName = self::DRIVER_SQLSRV;
             }
 
             if (in_array($driverName, DriverManager::getAvailableDrivers())) {
@@ -807,6 +857,21 @@ class Database
     }
 
     /**
+     * Prepare & Execute directly
+     *
+     * @param string $query
+     * @param array $bind
+     *
+     * @return Statement
+     */
+    public function executePrepare(string $query, array $bind = []) : Statement
+    {
+        $stmt = $this->prepare($query);
+        $stmt->execute($bind);
+        return $stmt;
+    }
+
+    /**
      * --------------------------------------------------------------
      * SCHEMA
      *
@@ -849,9 +914,39 @@ class Database
      *
      * @return array
      */
-    public function listDatabases() : array
+    public function getListDatabases() : array
     {
         return $this->getSchemaManager()->listDatabases();
+    }
+
+    /**
+     * Alias @uses getListDatabases()
+     *
+     * @return array
+     */
+    public function getListDatabase() : array
+    {
+        return $this->getListDatabases();
+    }
+
+    /**
+     * Alias @uses getListDatabases()
+     *
+     * @return array
+     */
+    public function getDatabases() : array
+    {
+        return $this->getListDatabases();
+    }
+
+    /**
+     * Alias @uses getListDatabases()
+     *
+     * @return array
+     */
+    public function listDatabases() : array
+    {
+        return $this->getListDatabases();
     }
 
     /**
@@ -859,9 +954,39 @@ class Database
      *
      * @return array
      */
+    public function getListNamespaceNames() : array
+    {
+        return $this->getSchemaManager()->listNamespaceNames();
+    }
+
+    /**
+     * Alias @uses getListNamespaceNames()
+     *
+     * @return array
+     */
+    public function getListNamespaceName() : array
+    {
+        return $this->getListNamespaceNames();
+    }
+
+    /**
+     * Alias @uses getListNamespaceNames()
+     *
+     * @return array
+     */
+    public function getNamespaceNames() : array
+    {
+        return $this->getListNamespaceNames();
+    }
+
+    /**
+     * Alias @uses getListNamespaceNames()
+     *
+     * @return array
+     */
     public function listNamespaceNames() : array
     {
-        return $this->getSchemaManager()->listDatabases();
+        return $this->getListNamespaceNames();
     }
 
     /**
@@ -869,9 +994,39 @@ class Database
      *
      * @return Sequence[]
      */
-    public function listSequences() : array
+    public function getSequences() : array
     {
         return $this->getSchemaManager()->listSequences();
+    }
+
+    /**
+     * alias @uses getSequences()
+     *
+     * @return Sequence[]
+     */
+    public function getListSequences() : array
+    {
+        return $this->getSequences();
+    }
+
+    /**
+     * alias @uses getSequences()
+     *
+     * @return Sequence[]
+     */
+    public function getListSequence() : array
+    {
+        return $this->getSequences();
+    }
+
+    /**
+     * alias @uses getSequences()
+     *
+     * @return Sequence[]
+     */
+    public function listSequences() : array
+    {
+        return $this->getSequences();
     }
 
     /**
@@ -880,12 +1035,45 @@ class Database
      * @param string $tableName
      * @return Column[]
      */
-    public function listTableColumns(string $tableName) : array
+    public function getTableColumns(string $tableName) : array
     {
         $tableName = $this->tableMaybeInvalid($tableName);
         return $this
             ->getSchemaManager()
             ->listTableColumns($tableName);
+    }
+
+    /**
+     * aliases @uses getTableColumns()
+     *
+     * @param string $tableName
+     * @return Column[]
+     */
+    public function getListTableColumn(string $tableName) : array
+    {
+        return $this->getTableColumns($tableName);
+    }
+
+    /**
+     * aliases @uses getTableColumns()
+     *
+     * @param string $tableName
+     * @return Column[]
+     */
+    public function getListTableColumns(string $tableName) : array
+    {
+        return $this->getTableColumns($tableName);
+    }
+
+    /**
+     * aliases @uses getTableColumns()
+     *
+     * @param string $tableName
+     * @return Column[]
+     */
+    public function listTableColumns(string $tableName) : array
+    {
+        return $this->getTableColumns($tableName);
     }
 
     /**
@@ -897,12 +1085,48 @@ class Database
      *
      * @return Index[]
      */
-    public function listTableIndexes(string $tableName) : array
+    public function getListTableIndexes(string $tableName) : array
     {
         $tableName = $this->tableMaybeInvalid($tableName);
         return $this
             ->getSchemaManager()
             ->listTableIndexes($tableName);
+    }
+
+    /**
+     * alias @uses getListTableIndexes()
+     *
+     * @param string $tableName
+     *
+     * @return Index[]
+     */
+    public function getTableIndexes(string $tableName) : array
+    {
+        return $this->getListTableIndexes($tableName);
+    }
+
+    /**
+     * alias @uses getListTableIndexes()
+     *
+     * @param string $tableName
+     *
+     * @return Index[]
+     */
+    public function getListTableIndex(string $tableName) : array
+    {
+        return $this->getListTableIndexes($tableName);
+    }
+
+    /**
+     * alias @uses getListTableIndexes()
+     *
+     * @param string $tableName
+     *
+     * @return Index[]
+     */
+    public function listTableIndexes(string $tableName) : array
+    {
+        return $this->getListTableIndexes($tableName);
     }
 
     /**
@@ -933,7 +1157,7 @@ class Database
      *
      * @return array
      */
-    public function listTableNames() : array
+    public function getListTableNames() : array
     {
         return $this
             ->getSchemaManager()
@@ -941,15 +1165,65 @@ class Database
     }
 
     /**
-     * Get List Table
+     * Alias @uses getListTableNames()
+     *
+     * @return array
+     */
+    public function getTableNames() : array
+    {
+        return $this->getListTableNames();
+    }
+
+    /**
+     * Alias @uses getListTableNames()
+     *
+     * @return array
+     */
+    public function getListTableName() : array
+    {
+        return $this->getListTableNames();
+    }
+
+    /**
+     * Alias @uses getListTableNames()
+     *
+     * @return array
+     */
+    public function listTableNames() : array
+    {
+        return $this->getListTableNames();
+    }
+
+    /**
+     * Get List Tables
+     *
+     * @return Table[]
+     */
+    public function getListTables() : array
+    {
+        return $this
+            ->getSchemaManager()
+            ->listTables();
+    }
+
+    /**
+     * Alias @uses getListTables()
+     *
+     * @return Table[]
+     */
+    public function getListTable() : array
+    {
+        return $this->getListTables();
+    }
+
+    /**
+     * Alias @uses getListTables()
      *
      * @return Table[]
      */
     public function listTables() : array
     {
-        return $this
-            ->getSchemaManager()
-            ->listTables();
+        return $this->getListTables();
     }
 
     /**
@@ -959,10 +1233,46 @@ class Database
      *
      * @return Table
      */
-    public function listTableDetails(string $tableName) : Table
+    public function getTableDetails(string $tableName) : Table
     {
         $tableName = $this->tableMaybeInvalid($tableName);
         return $this->getSchemaManager()->listTableDetails($tableName);
+    }
+
+    /**
+     * Alias @uses getTableDetails()
+     *
+     * @param string $tableName
+     *
+     * @return Table
+     */
+    public function getListTableDetails(string $tableName) : Table
+    {
+        return $this->getTableDetails($tableName);
+    }
+
+    /**
+     * Alias @uses getTableDetails()
+     *
+     * @param string $tableName
+     *
+     * @return Table
+     */
+    public function getListTableDetail(string $tableName) : Table
+    {
+        return $this->getTableDetails($tableName);
+    }
+
+    /**
+     * Alias @uses getTableDetails()
+     *
+     * @param string $tableName
+     *
+     * @return Table
+     */
+    public function listTableDetails(string $tableName) : Table
+    {
+        return $this->getTableDetails($tableName);
     }
 
     /**
@@ -976,16 +1286,72 @@ class Database
     }
 
     /**
+     * Get List views, alias @uses listViews()
+     *
+     * @return View[]
+     */
+    public function getListViews() : array
+    {
+        return $this->listViews();
+    }
+
+    /**
+     * Get List views, alias @uses listViews()
+     *
+     * @return View[]
+     */
+    public function getListView() : array
+    {
+        return $this->listViews();
+    }
+
+    /**
      * Lists the foreign keys for the given table.
      *
      * @param string      $tableName    The name of the table.
      *
      * @return ForeignKeyConstraint[]
      */
-    public function listTableForeignKeys(string $tableName) : array
+    public function getTableForeignKeys(string $tableName) : array
     {
         $tableName = $this->tableMaybeInvalid($tableName);
         return $this->getSchemaManager()->listTableForeignKeys($tableName);
+    }
+
+    /**
+     * Alias @uses getTableForeignKeys()
+     *
+     * @param string $tableName
+     *
+     * @return ForeignKeyConstraint[]
+     */
+    public function getListTableForeignKeys(string $tableName) : array
+    {
+        return $this->getTableForeignKeys($tableName);
+    }
+
+    /**
+     * Alias @uses getTableForeignKeys()
+     *
+     * @param string $tableName
+     *
+     * @return ForeignKeyConstraint[]
+     */
+    public function getListTableForeignKey(string $tableName) : array
+    {
+        return $this->getTableForeignKeys($tableName);
+    }
+
+    /**
+     * Alias @uses getTableForeignKeys()
+     *
+     * @param string $tableName
+     *
+     * @return ForeignKeyConstraint[]
+     */
+    public function listTableForeignKeys(string $tableName) : array
+    {
+        return $this->getTableForeignKeys($tableName);
     }
 
     /**
