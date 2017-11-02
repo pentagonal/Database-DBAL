@@ -2,7 +2,7 @@
 
 Just to extend `Doctrine DBAL` in an easier way for `lazy people`
 
-[![Build Status](https://travis-ci.org/pentagonal/DotrineDBALExtender.svg?branch=1.0)](https://travis-ci.org/pentagonal/DotrineDBALExtender?branch=1.0)
+[![Build Status](https://travis-ci.org/pentagonal/Database-DBAL.svg?branch=1.0)](https://travis-ci.org/pentagonal/Database-DBAL?branch=1.0)
 
 ## USAGE
 
