@@ -261,6 +261,21 @@ class Database
          */
         $this->currentUserParams = $this->normalizeDatabaseParams($configs);
 
+        if (isset($this->currentUserParams[static::DB_PREFIX])) {
+            $prefix = $this->currentUserParams[static::DB_PREFIX];
+            if (!is_string($prefix) && ! is_bool($prefix) && !is_null($prefix)) {
+                throw new \InvalidArgumentException(
+                    'Prefix must be as a string %s given.',
+                    gettype($prefix)
+                );
+            }
+            if (is_string($prefix)) {
+                $this->currentTablePrefix = trim($prefix);
+            }
+        }
+
+        unset($this->currentUserParams[static::DB_PREFIX]);
+
         /**
          * Re-Sanitize Selected Driver
          */
