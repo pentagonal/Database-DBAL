@@ -312,7 +312,6 @@ class Database
          * Create New Connection
          */
         $this->currentConnection = DriverManager::getConnection($params);
-
         // set last params
         static::$lastParams = $this->currentUserParams;
         /**
@@ -555,6 +554,13 @@ class Database
             )
         ) {
             $currentUserParams['driverOptions'][\PDO::ATTR_TIMEOUT] = $timeout;
+        }
+
+        // correcting host
+        if (!isset($currentUserParams[self::DB_HOST])
+            || !$currentUserParams[self::DB_HOST]
+        ) {
+            $currentUserParams[self::DB_HOST] = 'localhost';
         }
 
         $currentUserParams['options'] = $currentUserParams['driverOptions'];
