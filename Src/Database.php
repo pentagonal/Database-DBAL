@@ -549,8 +549,7 @@ class Database
             $timeout = $timeout < 1 ? 5 : $timeout;
             $currentUserParams[self::DB_TIMEOUT] = $timeout;
         }
-        if (isset($timeout)
-            && (
+        if (isset($timeout) || (
                 !isset($currentUserParams['driverOptions'][\PDO::ATTR_TIMEOUT])
                 || !is_numeric($currentUserParams['driverOptions'][\PDO::ATTR_TIMEOUT])
             )
