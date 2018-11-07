@@ -454,14 +454,14 @@ class Database
             && $currentUserParams[self::DB_DRIVER] == 'pdo_sqlite'
         ) {
             if (empty($currentUserParams[self::DB_PATH])) {
-                if (is_string($currentUserParams[self::DB_NAME])
-                    && isset($currentUserParams[self::DB_NAME])
+                if (isset($currentUserParams[self::DB_NAME])
+                    && is_string($currentUserParams[self::DB_NAME])
                 ) {
                     $currentUserParams[self::DB_PATH] = $currentUserParams[self::DB_NAME];
                 }
             } elseif (empty($currentUserParams[self::DB_NAME])) {
-                if (is_string($currentUserParams[self::DB_PATH])
-                    && isset($currentUserParams[self::DB_PATH])
+                if (isset($currentUserParams[self::DB_PATH])
+                    && is_string($currentUserParams[self::DB_PATH])
                 ) {
                     $currentUserParams[self::DB_NAME] = $currentUserParams[self::DB_PATH];
                 }
