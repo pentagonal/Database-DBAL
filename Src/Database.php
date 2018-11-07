@@ -460,7 +460,7 @@ class Database
                     $currentUserParams[self::DB_PATH] = $currentUserParams[self::DB_NAME];
                 }
             } elseif (empty($currentUserParams[self::DB_NAME])) {
-                if (isset($currentUserParams[self::DB_PATH]) 
+                if (isset($currentUserParams[self::DB_PATH])
                     && is_string($currentUserParams[self::DB_PATH])
                 ) {
                     $currentUserParams[self::DB_NAME] = $currentUserParams[self::DB_PATH];
