@@ -324,11 +324,10 @@ class Database
     }
 
     /**
-     * Instance Database
-     *
-     * @param array $config
+     * @param array|null $config
      *
      * @return Database
+     * @throws DBALException
      */
     public static function create(array $config = null) : Database
     {
@@ -339,9 +338,8 @@ class Database
     }
 
     /**
-     * Create From last Parameter
-     *
      * @return Database
+     * @throws DBALException
      */
     public static function createFromLastParams() : Database
     {
@@ -398,6 +396,30 @@ class Database
             }
         }
 
+        $toSanity = [
+            self::DB_HOST => 'db_host',
+            self::DB_USER => 'db_user',
+            self::DB_NAME => 'db_name',
+            self::DB_PASSWORD => 'db_pass',
+            self::DB_DRIVER   => 'db_driver',
+            self::DB_PATH     => 'db_path',
+            self::DB_PORT     => 'db_port',
+            self::DB_PREFIX   => 'db_prefix',
+            self::DB_PROTOCOL => 'db_protocol',
+            self::DB_CHARSET  => 'db_charset',
+            self::DB_COLLATE  => 'db_collate',
+            self::DB_TIMEOUT  => 'db_timeout',
+            self::DB_OPTIONS  => 'db_options',
+        ];
+        foreach ($toSanity as $key => $name) {
+            if ($key === $name) {
+                continue;
+            }
+            if (!isset($currentUserParams[$key]) && isset($currentUserParams[$name])) {
+                $currentUserParams[$key] = $currentUserParams[$name];
+            }
+        }
+
         // re-sanitize db host
         if (!isset($currentUserParams[self::DB_HOST])) {
             if (isset($currentUserParams['hostname'])) {
@@ -424,6 +446,7 @@ class Database
                 $currentUserParams[self::DB_USER] = $currentUserParams['username'];
             }
         }
+
 
         /**
          * check if port in 3306 & empty driver
